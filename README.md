@@ -23,4 +23,4 @@ finally access the daemon logs
 kubectl logs -f node-audit-xxxx
 ```
 
-
+![Screenshot_1](https://user-images.githubusercontent.com/63874487/109349495-e3c17c80-782a-11eb-9d96-bb220b9b0da2.jpg)
