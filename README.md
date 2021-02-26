@@ -1,4 +1,4 @@
-# aks_node_audit_process_daemonset
+# K8s Node Audit Process Daemonset
 
 DaemonSets in Kubernetes allow you to run a pod on every node; this is a good fit if you want to bootstrap new nodes and install software. You can configure the privileges that a DaemonSet runs with and tune the level of access you need your DaemonSet to have based on the tasks it needs to perform. This is small demo on how to run script against nodes using daemonset. 
 
