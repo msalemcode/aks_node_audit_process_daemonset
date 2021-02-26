@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-audit
+spec:
+  selector:
+    matchLabels:
+      job: node-audit
+  template:
+    metadata:
+      labels:
+        job: node-audit
+    spec:
+      hostPID: true
+      restartPolicy: Always
+      containers:
+      - image: alpine:3.12.0
+        name: node-audit
+        securityContext:
+          privileged: true
+        command: ["/bin/sh"]
+        args:
+          - "-c"
+          - "sh /tmp/run_node_audit.sh"
+        volumeMounts:
+        - name: scripts-mount
+          mountPath: /tmp
+        - name: host-mount
+          mountPath: /host
+
+      volumes:
+      - name: scripts-mount
+        configMap:
+          name: scripts
+
+      - name: host-mount
+        hostPath:
+          path: /root

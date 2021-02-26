@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scripts
+data:
+  node_audit_script.sh: |
+    #!/bin/bash
+    KUBEPOD_CGROUP="kubepods"
+    # select all pids where the executable of the pid is a link to a file (this filters out kernel processes we don't care about)
+    non_kernel_pids="$(find -L /proc/[0-9]*/exe ! -type l | cut -d / -f3 | paste -sd " ")"
+    # filter out pods by checking that the proc is in whatever cgroup is configured for pods.
+    non_pods=""; for pid in $non_kernel_pids; do if [ -z "$(grep "$KUBEPOD_CGROUP" /proc/$pid/cgroup)" ]; then non_pods="$non_pods $pid"; fi; done
+    # get the command line invocation of this pid
+    commands=""; for pid in $non_pods; do commands="$commands\n $(echo $pid) $(cat "/proc/$pid/cmdline")"; done
+    # annoyingly clean NUL and newlines, maybe because processes can die after the above run(?):
+    commands="$(echo -e "$commands" | tr -d '\000' | grep .[a-zA-Z] --color=none)"
+    # there are a bunch of containerd shims for pods, I choose arbitraily to remove those
+    # (or the equivalent if your CRI isn't containerd).
+    exes_without_shims="$(echo -e "$commands"  | tr -d '\000' | grep . --color=none | grep -v "containerd-shim")"
+    echo  "==============================================================================================="
+    echo  "-----------------  Current Non AKS and Azure processes ----------------------------------------"
+    echo  "==============================================================================================="
+    # remove k8s and azure remaining processes.
+    exes_non_aks_azure_process="$(echo -e "$exes_without_shims"  |grep -v kubelet|grep -v waagent|grep -v WALinuxAgent | grep -v containerd |grep -v hv_kvp_daemon|grep -v dockerd)"
+    echo -e "$exes_non_aks_azure_process"
+    echo  "==============================================================================================="
+    echo  "-----------------  Current Non AKS/Azure Containers  List  ----------------------------------------"
+    echo  "==============================================================================================="
+    docker ps | grep -v k8s_
+    echo  ""
+    # get all running docker container names
+    containers=$(docker ps |grep -v k8s_| awk '{if(NR>1) print $NF}')
+    # loop through all containers
+    for container in $containers
+    do
+      echo "Container: $container - process  Detail:"
+      pstree -p $(docker inspect -f '{{.State.Pid}}'  $container)
+      echo
+      echo "-----------------------------------------------------------------------------------------------"
+    done
+
+  run_node_audit.sh: |
+    #!/bin/bash
+    # Copy audit script to host
+    cp /tmp/node_audit_script.sh /host
+    # Give execute priv to script
+    /usr/bin/nsenter -m/proc/1/ns/mnt -- chmod u+x /root/node_audit_script.sh
+    # If the /tmp folder is mounted on the host then it can run the script
+    /usr/bin/nsenter -m/proc/1/ns/mnt /root/node_audit_script.sh
+    # Sleep so that the Pod in the DaemonSet for 1hr
+    sleep 3600
